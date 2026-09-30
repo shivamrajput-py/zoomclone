@@ -1,5 +1,0 @@
-allowBuilds:
-  esbuild: true
-minimumReleaseAgeExclude:
-  - '@videosdk.live/react-sdk@0.13.3'
-verifyDepsBeforeRun: false
