@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timedelta, timezone
 
 
@@ -9,7 +10,8 @@ def test_instant_meeting_is_live_and_returns_host_token(client):
     res = client.post("/api/meetings/instant")
     assert res.status_code == 200
     body = res.json()
-    assert len(body["id"].split("-")) == 3
+    # Meeting ID must be numeric Zoom-style: ddd-ddd-ddd
+    assert re.fullmatch(r"\d{3}-\d{3}-\d{3}", body["id"]), f"Bad ID format: {body['id']}"
     assert body["status"] == "live"
     assert body["is_instant"] is True
     assert body["host_token"]
@@ -35,7 +37,10 @@ def test_schedule_meeting_appears_in_upcoming_sorted(client):
 
 
 def test_past_and_instant_meetings_not_upcoming(client):
-    client.post("/api/meetings/schedule", json={"title": "Past", "scheduled_at": _future(-1)})
+    # The API now rejects scheduling in the past with 422.
+    past_res = client.post("/api/meetings/schedule", json={"title": "Past", "scheduled_at": _future(-1)})
+    assert past_res.status_code == 422
+    # Instant meetings are live, not scheduled — they never appear in upcoming.
     client.post("/api/meetings/instant")
     assert client.get("/api/meetings/upcoming").json() == []
 
@@ -45,6 +50,10 @@ def test_schedule_validates_input(client):
     assert client.post("/api/meetings/schedule", json={"title": "x"}).status_code == 422
     assert client.post(
         "/api/meetings/schedule", json={"title": "x", "scheduled_at": _future(), "duration": 0}
+    ).status_code == 422
+    # Server-side past-date guard (client-side check is not enough).
+    assert client.post(
+        "/api/meetings/schedule", json={"title": "x", "scheduled_at": _future(-2)}
     ).status_code == 422
 
 

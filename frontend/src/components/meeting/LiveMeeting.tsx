@@ -7,6 +7,8 @@ import LiveMeetingView from "./LiveMeetingView";
 interface LiveMeetingProps {
   /** Our meeting id (what the user sees and shares). */
   meetingId: string;
+  /** Human-readable title shown in the top bar, e.g. "Alex's Zoom Meeting". */
+  meetingTitle?: string;
   /** Token and room id issued by our backend for this participant. */
   media: MediaCredentials;
   participantId: number;
@@ -28,6 +30,7 @@ interface LiveMeetingProps {
  */
 export default function LiveMeeting({
   meetingId,
+  meetingTitle,
   media,
   participantId,
   name,
@@ -56,6 +59,7 @@ export default function LiveMeeting({
     >
       <LiveMeetingView
         meetingId={meetingId}
+        meetingTitle={meetingTitle}
         mediaToken={media.token}
         socket={socket}
         handlersRef={handlersRef}

@@ -235,7 +235,7 @@ function Sidebar({
   );
 }
 
-// ─── Quick actions (Schedule / Join / Host) ───────────────────────────────────
+// ─── Quick actions (New meeting / Join / Schedule) ───────────────────────────
 function QuickActions({
   onNewMeeting,
   onJoin,
@@ -248,28 +248,38 @@ function QuickActions({
   starting: boolean;
 }) {
   const tile = "flex h-[50px] w-[50px] items-center justify-center rounded-xl text-white";
-  const item = "flex w-[72px] flex-col items-center gap-2 disabled:opacity-60";
-  const label = "text-xs font-semibold text-[#4a4f63]";
+  const item = "flex w-[80px] flex-col items-center gap-2 disabled:opacity-60";
+  const label = "text-xs font-semibold text-[#4a4f63] whitespace-nowrap";
   return (
-    <div className="flex items-start justify-center gap-6">
-      <button onClick={onSchedule} className={item}>
-        <span className={`${tile} relative bg-[#0e72ed]`}>
-          <Calendar className="h-6 w-6" strokeWidth={2} />
-          <span className="absolute top-[21px] text-[8px] font-bold leading-none">19</span>
+    <div className="flex items-start justify-center gap-5">
+      {/* 1. New meeting — orange, with caret (matches Zoom exactly) */}
+      <button onClick={onNewMeeting} disabled={starting} className={item}>
+        <span className={`${tile} relative bg-[#ff742e]`}>
+          <Video className="h-6 w-6" fill="currentColor" />
         </span>
-        <span className={label}>Schedule</span>
+        <span className={`${label} flex items-center gap-0.5`}>
+          {starting ? "Starting…" : "New meeting"}
+          <ChevronDown className="h-3 w-3" strokeWidth={2.5} />
+        </span>
       </button>
+
+      {/* 2. Join — blue */}
       <button onClick={onJoin} className={item}>
         <span className={`${tile} bg-[#0e72ed]`}>
           <Plus className="h-6 w-6" strokeWidth={2.5} />
         </span>
         <span className={label}>Join</span>
       </button>
-      <button onClick={onNewMeeting} disabled={starting} className={item}>
-        <span className={`${tile} bg-[#ff742e]`}>
-          <Video className="h-6 w-6" fill="currentColor" />
+
+      {/* 3. Schedule — blue calendar */}
+      <button onClick={onSchedule} className={item}>
+        <span className={`${tile} relative bg-[#0e72ed]`}>
+          <Calendar className="h-6 w-6" strokeWidth={2} />
+          <span className="absolute top-[22px] text-[8px] font-bold leading-none">
+            {new Date().getDate()}
+          </span>
         </span>
-        <span className={label}>{starting ? "Starting…" : "Host"}</span>
+        <span className={label}>Schedule</span>
       </button>
     </div>
   );

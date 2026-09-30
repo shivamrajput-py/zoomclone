@@ -2,21 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, ChevronLeft } from "lucide-react";
 import { api, apiErrorMessage } from "@/lib/api";
 import { saveHostToken } from "@/lib/hostTokens";
 
-const DURATION_OPTIONS = [
-  { value: 15,  label: "15 minutes" },
-  { value: 30,  label: "30 minutes" },
-  { value: 45,  label: "45 minutes" },
-  { value: 60,  label: "1 hour" },
-  { value: 90,  label: "1 hour 30 minutes" },
-  { value: 120, label: "2 hours" },
-  { value: 180, label: "3 hours" },
-];
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => i);
+const MIN_OPTIONS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
-/** yyyy-mm-dd in the user's local timezone (toISOString would give the UTC date). */
+/** yyyy-mm-dd in the user's local timezone */
 function localDateString(d: Date) {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -28,40 +21,72 @@ function getTomorrow() {
   return localDateString(d);
 }
 
+function getLocalTimezone() {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return "UTC"; }
+}
+
+function tzOffset() {
+  const off = new Date().getTimezoneOffset();
+  const sign = off <= 0 ? "+" : "-";
+  const abs = Math.abs(off);
+  const h = Math.floor(abs / 60);
+  const m = abs % 60;
+  return `${sign}${h}:${String(m).padStart(2, "0")}`;
+}
+
+const inputCls =
+  "w-full rounded border border-[#d8d8d8] bg-white px-3 py-2 text-sm text-[#232333] outline-none focus:border-[#0b5cff] focus:ring-1 focus:ring-[#0b5cff]";
+const selectCls =
+  "rounded border border-[#d8d8d8] bg-white px-2 py-2 text-sm text-[#232333] outline-none focus:border-[#0b5cff] cursor-pointer";
+const labelCls = "block text-sm font-medium text-[#232333] min-w-[90px] shrink-0";
+
 export default function SchedulePage() {
   const router = useRouter();
-  const [title, setTitle] = useState("My Meeting");
+  const [title, setTitle] = useState("");
+  const [showDesc, setShowDesc] = useState(false);
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(getTomorrow());
-  const [time, setTime] = useState("10:00");
-  const [duration, setDuration] = useState(60);
+  const [time, setTime] = useState("10:30");
+  const [ampm, setAmpm] = useState<"AM" | "PM">("AM");
+  const [durationHr, setDurationHr] = useState(0);
+  const [durationMin, setDurationMin] = useState(40);
+  const [recurring, setRecurring] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [scheduled, setScheduled] = useState<{ id: string } | null>(null);
+  const [scheduled, setScheduled] = useState<{ id: string; title: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const timezone = getLocalTimezone();
 
   async function handleSchedule(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
-    // Local date + time -> an absolute instant (sent as UTC; the server stores UTC).
-    const startsAt = new Date(`${date}T${time}`);
+    // Convert 12-hr picker to 24-hr for Date parsing
+    const [hrStr, minStr] = time.split(":");
+    let hr = parseInt(hrStr, 10);
+    const min = parseInt(minStr || "0", 10);
+    if (ampm === "PM" && hr !== 12) hr += 12;
+    if (ampm === "AM" && hr === 12) hr = 0;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const localIso = `${date}T${pad(hr)}:${pad(min)}:00`;
+    const startsAt = new Date(localIso);
+
     if (Number.isNaN(startsAt.getTime()) || startsAt.getTime() <= Date.now()) {
       setError("Pick a date and time in the future.");
       return;
     }
 
+    const totalMin = durationHr * 60 + durationMin;
     setLoading(true);
     try {
       const meeting = await api.scheduleMeeting({
-        title: title.trim(),
+        title: (title.trim() || "My Meeting"),
         description: description.trim() || null,
         scheduled_at: startsAt.toISOString(),
-        duration,
+        duration: totalMin > 0 ? totalMin : undefined,
       });
-      // Lets this browser start the meeting later as its host.
       saveHostToken(meeting.id, meeting.host_token);
-      setScheduled(meeting);
+      setScheduled({ id: meeting.id, title: title.trim() || "My Meeting" });
     } catch (err) {
       setError(apiErrorMessage(err, "Couldn't schedule the meeting. Please try again."));
     } finally {
@@ -76,38 +101,46 @@ export default function SchedulePage() {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  // ── Success screen ─────────────────────────────────────────────────────────
   if (scheduled) {
-    const inviteLink = `${typeof window !== "undefined" ? window.location.origin : ""}/meeting/${scheduled.id}`;
+    const inviteLink =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/meeting/${scheduled.id}`
+        : `/meeting/${scheduled.id}`;
     return (
-      <div className="flex min-h-screen items-center justify-center bg-portal-bg px-4">
-        <div className="w-full max-w-sm rounded-2xl border border-portal-border bg-portal-card px-8 py-8 shadow-sm text-center">
+      <div className="flex min-h-screen items-center justify-center bg-[#f7f8fa] px-4">
+        <div className="w-full max-w-sm rounded-2xl border border-[#e8e8ee] bg-white px-8 py-8 shadow-sm text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-green-600">
             <Check className="h-7 w-7" />
           </div>
-          <h2 className="mb-1 text-lg font-semibold text-text-on-light">Meeting Scheduled!</h2>
-          <p className="mb-5 text-sm text-text-label">{title}</p>
+          <h2 className="mb-1 text-lg font-semibold text-[#0e0e1a]">Meeting Scheduled!</h2>
+          <p className="mb-5 text-sm text-[#4a4f63]">{scheduled.title}</p>
 
-          <div className="mb-4 rounded-xl bg-portal-bg px-4 py-3 text-left">
-            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-text-label">Meeting ID</p>
-            <p className="font-mono text-sm font-semibold text-text-on-light">{scheduled.id}</p>
+          <div className="mb-4 rounded-xl bg-[#f7f8fa] px-4 py-3 text-left">
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#4a4f63]">
+              Meeting ID
+            </p>
+            <p className="font-mono text-sm font-semibold text-[#0e0e1a]">{scheduled.id}</p>
           </div>
 
-          <div className="mb-6 rounded-xl bg-portal-bg px-4 py-3 text-left">
-            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-text-label">Invite Link</p>
-            <p className="break-all font-mono text-xs text-text-on-light">{inviteLink}</p>
+          <div className="mb-6 rounded-xl bg-[#f7f8fa] px-4 py-3 text-left">
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#4a4f63]">
+              Invite Link
+            </p>
+            <p className="break-all font-mono text-xs text-[#0e0e1a]">{inviteLink}</p>
           </div>
 
           <div className="flex gap-2">
             <button
               onClick={copyLink}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-portal-border py-2 text-sm font-medium text-text-on-light hover:bg-portal-hover"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-[#e8e8ee] py-2 text-sm font-medium text-[#232333] hover:bg-[#f0f1f5]"
             >
               {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
               {copied ? "Copied!" : "Copy Link"}
             </button>
             <button
               onClick={() => router.push("/")}
-              className="flex-1 rounded-lg bg-zoom-blue py-2 text-sm font-semibold text-white hover:bg-zoom-blue-hover"
+              className="flex-1 rounded-lg bg-[#0b5cff] py-2 text-sm font-semibold text-white hover:bg-[#0950e8]"
             >
               Done
             </button>
@@ -117,106 +150,198 @@ export default function SchedulePage() {
     );
   }
 
+  // ── Schedule form ──────────────────────────────────────────────────────────
   return (
-    <div className="flex min-h-screen items-center justify-center bg-portal-bg px-4">
-      <div className="w-full max-w-lg">
-        {/* Logo */}
-        <div className="mb-8 flex items-center justify-center gap-2">
-          <svg width="32" height="32" viewBox="0 0 40 40" fill="none">
-            <rect width="40" height="40" rx="8" fill="#0B5CFF"/>
-            <path d="M8 14.5C8 12.567 9.567 11 11.5 11h13C26.433 11 28 12.567 28 14.5v11C28 27.433 26.433 29 24.5 29h-13C9.567 29 8 27.433 8 25.5v-11Z" fill="white"/>
-            <path d="M29 16l6-4v16l-6-4V16Z" fill="white"/>
-          </svg>
-          <span className="text-2xl font-semibold text-text-on-light">Zoom</span>
-        </div>
+    <div className="min-h-screen bg-white">
+      {/* Zoom-style utility bar */}
+      <div className="hidden h-9 shrink-0 items-center justify-end gap-6 bg-[#00051f] px-5 text-[13px] font-medium text-white md:flex">
+        <span>Support</span>
+        <span className="h-4 w-px bg-white/30" />
+        <span>Contact Sales</span>
+        <span>Request a Demo</span>
+      </div>
 
-        <div className="rounded-2xl border border-portal-border bg-portal-card px-8 py-8 shadow-sm">
-          <h1 className="mb-6 text-xl font-semibold text-text-on-light">Schedule a Meeting</h1>
+      <div className="flex">
+        {/* Left sidebar */}
+        <aside className="hidden w-[200px] shrink-0 border-r border-[#e8e8ee] bg-[#f7f9fc] min-h-screen pt-3 px-1.5 md:block">
+          <button
+            onClick={() => router.push("/")}
+            className="w-full rounded-md px-3 py-[7px] text-left text-sm text-[#232333] hover:bg-[#f0f1f5]"
+          >
+            Home
+          </button>
+          <p className="px-1.5 pb-2 pt-5 text-xs text-[#4a4f63]">My Products</p>
+          {["AI", "Meetings", "Recordings", "Summaries"].map((l) => (
+            <button
+              key={l}
+              className={`w-full rounded-md px-3 py-[7px] pl-6 text-left text-sm hover:bg-[#f0f1f5] ${
+                l === "Meetings" ? "bg-[#eaf1ff] text-[#0b5cff]" : "text-[#232333]"
+              }`}
+            >
+              {l}
+            </button>
+          ))}
+        </aside>
 
-          <form onSubmit={handleSchedule} className="space-y-5">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-text-on-light">Topic <span className="text-leave">*</span></label>
-              <input
-                type="text"
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                className="w-full rounded-lg border border-portal-border bg-portal-bg px-3.5 py-2.5 text-sm text-text-on-light outline-none focus:border-zoom-blue focus:ring-1 focus:ring-zoom-blue"
-                required
-              />
+        {/* Main form area */}
+        <main className="flex-1 px-6 py-8 md:px-12 md:py-10 max-w-3xl">
+          {/* Back to Meetings link */}
+          <button
+            onClick={() => router.push("/")}
+            className="mb-6 flex items-center gap-1 text-sm text-[#0b5cff] hover:underline"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Back to Meetings
+          </button>
+
+          <h1 className="mb-8 text-2xl font-semibold text-[#0e0e1a]">Schedule Meeting</h1>
+
+          <form onSubmit={handleSchedule} className="space-y-6 max-w-xl">
+            {/* Topic */}
+            <div className="flex items-start gap-4">
+              <label className={`${labelCls} pt-2`}>
+                <span className="text-[#e02b20] mr-0.5">*</span>Topic
+              </label>
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="My Meeting"
+                  className={inputCls}
+                />
+                {!showDesc ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowDesc(true)}
+                    className="mt-2 flex items-center gap-1 text-sm text-[#0b5cff] hover:underline"
+                  >
+                    + Add Description
+                  </button>
+                ) : (
+                  <textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={2}
+                    placeholder="Meeting description"
+                    className={`${inputCls} mt-2 resize-none`}
+                  />
+                )}
+              </div>
             </div>
 
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-text-on-light">Description <span className="text-text-label text-xs">(optional)</span></label>
-              <textarea
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                rows={2}
-                placeholder="Add a description…"
-                className="w-full resize-none rounded-lg border border-portal-border bg-portal-bg px-3.5 py-2.5 text-sm text-text-on-light placeholder:text-text-label outline-none focus:border-zoom-blue focus:ring-1 focus:ring-zoom-blue"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-text-on-light">Date <span className="text-leave">*</span></label>
+            {/* When */}
+            <div className="flex items-center gap-4">
+              <label className={labelCls}>When</label>
+              <div className="flex flex-wrap items-center gap-2">
                 <input
                   type="date"
                   value={date}
-                  onChange={e => setDate(e.target.value)}
+                  onChange={(e) => setDate(e.target.value)}
                   min={localDateString(new Date())}
-                  className="w-full rounded-lg border border-portal-border bg-portal-bg px-3.5 py-2.5 text-sm text-text-on-light outline-none focus:border-zoom-blue focus:ring-1 focus:ring-zoom-blue"
+                  className={`${selectCls} min-w-[140px]`}
                   required
                 />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-text-on-light">Time <span className="text-leave">*</span></label>
                 <input
                   type="time"
                   value={time}
-                  onChange={e => setTime(e.target.value)}
-                  className="w-full rounded-lg border border-portal-border bg-portal-bg px-3.5 py-2.5 text-sm text-text-on-light outline-none focus:border-zoom-blue focus:ring-1 focus:ring-zoom-blue"
+                  onChange={(e) => setTime(e.target.value)}
+                  className={`${selectCls} w-28`}
                   required
                 />
+                <select
+                  value={ampm}
+                  onChange={(e) => setAmpm(e.target.value as "AM" | "PM")}
+                  className={`${selectCls} w-16`}
+                >
+                  <option>AM</option>
+                  <option>PM</option>
+                </select>
               </div>
             </div>
 
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-text-on-light">Duration</label>
-              <select
-                value={duration}
-                onChange={e => setDuration(Number(e.target.value))}
-                className="w-full rounded-lg border border-portal-border bg-portal-bg px-3.5 py-2.5 text-sm text-text-on-light outline-none focus:border-zoom-blue focus:ring-1 focus:ring-zoom-blue"
-              >
-                {DURATION_OPTIONS.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
+            {/* Duration */}
+            <div className="flex items-center gap-4">
+              <label className={labelCls}>Duration</label>
+              <div className="flex items-center gap-2">
+                <select
+                  value={durationHr}
+                  onChange={(e) => setDurationHr(Number(e.target.value))}
+                  className={`${selectCls} w-16`}
+                >
+                  {HOUR_OPTIONS.map((h) => (
+                    <option key={h} value={h}>{h}</option>
+                  ))}
+                </select>
+                <span className="text-sm text-[#232333]">hr</span>
+                <select
+                  value={durationMin}
+                  onChange={(e) => setDurationMin(Number(e.target.value))}
+                  className={`${selectCls} w-16`}
+                >
+                  {MIN_OPTIONS.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+                <span className="text-sm text-[#232333]">min</span>
+              </div>
+            </div>
+
+            {/* Time Zone */}
+            <div className="flex items-center gap-4">
+              <label className={labelCls}>Time Zone</label>
+              <select className={`${selectCls} w-72`} defaultValue={timezone}>
+                <option value={timezone}>
+                  (GMT{tzOffset()}) {timezone}
+                </option>
               </select>
             </div>
 
+            {/* Recurring */}
+            <div className="flex items-center gap-4">
+              <div className={labelCls} aria-hidden="true" />
+              <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-[#232333]">
+                <input
+                  type="checkbox"
+                  checked={recurring}
+                  onChange={(e) => setRecurring(e.target.checked)}
+                  className="h-4 w-4 rounded border-[#d8d8d8] accent-[#0b5cff]"
+                />
+                Recurring meeting
+              </label>
+            </div>
+
             {error && (
-              <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
-                {error}
-              </p>
+              <div className="flex gap-4">
+                <div className={labelCls} aria-hidden="true" />
+                <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+                  {error}
+                </p>
+              </div>
             )}
 
-            <div className="flex gap-3 pt-1">
-              <button
-                type="button"
-                onClick={() => router.push("/")}
-                className="flex-1 rounded-lg border border-portal-border py-2.5 text-sm font-medium text-text-on-light hover:bg-portal-hover"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={loading || !title.trim() || !date || !time}
-                className="flex-1 rounded-lg bg-zoom-blue py-2.5 text-sm font-semibold text-white hover:bg-zoom-blue-hover disabled:opacity-50 transition-colors"
-              >
-                {loading ? "Saving…" : "Save"}
-              </button>
+            {/* Buttons — left-aligned, Zoom style */}
+            <div className="flex items-center gap-4 pt-2">
+              <div className={labelCls} aria-hidden="true" />
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="rounded bg-[#0b5cff] px-7 py-2 text-sm font-semibold text-white hover:bg-[#0950e8] disabled:opacity-50 transition-colors"
+                >
+                  {loading ? "Saving…" : "Save"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push("/")}
+                  className="rounded border border-[#d8d8d8] bg-white px-7 py-2 text-sm font-medium text-[#232333] hover:bg-[#f0f1f5] transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </form>
-        </div>
+        </main>
       </div>
     </div>
   );

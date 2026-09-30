@@ -416,38 +416,57 @@ export default function ControlBar({
       </div>
       )}
 
-      {/* Right: leave / end */}
-      <div className="relative flex items-center">
-        <button
-          onClick={() => (onEnd ? setLeaveMenu((v) => !v) : onLeave())}
-          className="rounded-md bg-leave px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-leave-hover"
-        >
-          {onEnd ? "End" : "Leave"}
-        </button>
-        {leaveMenu && onEnd && (
+      {/* Right: leave / end — matches Zoom's round red ✕ button */}
+      <div className="relative flex items-center gap-2">
+        {onEnd ? (
           <>
-            <div className="fixed inset-0 z-10" onClick={() => setLeaveMenu(false)} />
-            <div className="absolute bottom-14 right-0 z-20 w-52 overflow-hidden rounded-lg bg-panel-2 py-1 shadow-lg ring-1 ring-panel-border">
-              <button
-                onClick={() => {
-                  setLeaveMenu(false);
-                  onEnd();
-                }}
-                className="block w-full px-4 py-2 text-left text-sm font-medium text-leave-hover hover:bg-hover"
-              >
-                End Meeting for All
-              </button>
-              <button
-                onClick={() => {
-                  setLeaveMenu(false);
-                  onLeave();
-                }}
-                className="block w-full px-4 py-2 text-left text-sm text-text-primary hover:bg-hover"
-              >
-                Leave Meeting
-              </button>
-            </div>
+            {/* Leave button (text-only, secondary) */}
+            <button
+              onClick={() => setLeaveMenu((v) => !v)}
+              className="flex items-center gap-2 rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20"
+            >
+              Leave
+            </button>
+            {/* Round red End circle — matches Zoom exactly */}
+            <button
+              onClick={() => onEnd()}
+              title="End meeting for all"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-leave text-white transition-colors hover:bg-leave-hover"
+              aria-label="End meeting"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+            {leaveMenu && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setLeaveMenu(false)} />
+                <div className="absolute bottom-14 right-0 z-20 w-52 overflow-hidden rounded-lg bg-panel-2 py-1 shadow-lg ring-1 ring-panel-border">
+                  <button
+                    onClick={() => { setLeaveMenu(false); onEnd(); }}
+                    className="block w-full px-4 py-2 text-left text-sm font-medium text-leave-hover hover:bg-hover"
+                  >
+                    End Meeting for All
+                  </button>
+                  <button
+                    onClick={() => { setLeaveMenu(false); onLeave(); }}
+                    className="block w-full px-4 py-2 text-left text-sm text-text-primary hover:bg-hover"
+                  >
+                    Leave Meeting
+                  </button>
+                </div>
+              </>
+            )}
           </>
+        ) : (
+          /* Guest: single Leave button */
+          <button
+            onClick={onLeave}
+            className="rounded-md bg-leave px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-leave-hover"
+          >
+            Leave
+          </button>
         )}
       </div>
 

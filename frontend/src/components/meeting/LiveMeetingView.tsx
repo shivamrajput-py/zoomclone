@@ -84,6 +84,8 @@ function useElapsed(): string {
 interface LiveMeetingViewProps {
   /** Our meeting id (shown in the top bar and used for host actions). */
   meetingId: string;
+  /** Human-readable title for the top bar, e.g. "Alex's Zoom Meeting". */
+  meetingTitle?: string;
   /** Participant-scoped media token, also used for chat file storage. */
   mediaToken: string;
   /** Realtime room state and sender, owned by MeetingSession. */
@@ -96,6 +98,7 @@ interface LiveMeetingViewProps {
 
 export default function LiveMeetingView({
   meetingId,
+  meetingTitle,
   mediaToken,
   socket,
   handlersRef,
@@ -483,6 +486,7 @@ export default function LiveMeetingView({
       )}
       <TopBar
         meetingId={meetingId}
+        meetingTitle={meetingTitle}
         elapsed={elapsed}
         view={view}
         onSetView={setView}

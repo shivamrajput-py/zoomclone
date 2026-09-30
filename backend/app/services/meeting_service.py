@@ -1,6 +1,7 @@
+import random
 import secrets
-import uuid
 
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -14,10 +15,11 @@ RECENT_MEETINGS_LIMIT = 20
 
 
 def _generate_meeting_id(db: Session) -> str:
-    """Zoom-style ID (xxx-xxx-xxx); retries on the unlikely collision."""
+    """Zoom-style numeric ID (ddd-ddd-ddd); retries on the unlikely collision."""
     while True:
-        raw = uuid.uuid4().hex[:9]
-        meeting_id = f"{raw[:3]}-{raw[3:6]}-{raw[6:]}"
+        # 9 random decimal digits: cryptographically random, uniform distribution.
+        digits = "".join(str(random.SystemRandom().randint(0, 9)) for _ in range(9))
+        meeting_id = f"{digits[:3]}-{digits[3:6]}-{digits[6:]}"
         if db.get(Meeting, meeting_id) is None:
             return meeting_id
 
@@ -48,11 +50,18 @@ def create_instant_meeting(db: Session) -> Meeting:
 
 
 def schedule_meeting(db: Session, data: MeetingCreate) -> Meeting:
+    # Server-side guard: reject scheduling in the past regardless of client-side checks.
+    scheduled_utc = to_naive_utc(data.scheduled_at)
+    if scheduled_utc <= utcnow():
+        raise HTTPException(
+            status_code=422,
+            detail="scheduled_at must be a future date and time.",
+        )
     return _new_meeting(
         db,
         title=data.title,
         description=data.description,
-        scheduled_at=to_naive_utc(data.scheduled_at),
+        scheduled_at=scheduled_utc,
         duration_minutes=data.duration,
         is_instant=False,
         status=MeetingStatus.SCHEDULED,

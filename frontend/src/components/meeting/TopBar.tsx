@@ -4,18 +4,14 @@ import { useSettingsStore } from "@/store/useSettingsStore";
 
 interface TopBarProps {
   meetingId: string;
+  meetingTitle?: string;
   elapsed: string;
   view: "gallery" | "speaker";
   onSetView: (v: "gallery" | "speaker") => void;
-  /**
-   * Applies the Original Sound preference to the live mic (rebuild the audio
-   * track with/without DSP). Live-only; Demo has no real stream, so it's the
-   * store toggle alone (label-only there).
-   */
   onOriginalSoundChange?: (on: boolean) => void;
 }
 
-export default function TopBar({ meetingId, elapsed, view, onSetView, onOriginalSoundChange }: TopBarProps) {
+export default function TopBar({ meetingId, meetingTitle, elapsed, view, onSetView, onOriginalSoundChange }: TopBarProps) {
   const [info, setInfo] = useState(false);
   const [viewMenu, setViewMenu] = useState(false);
   const [soundMenu, setSoundMenu] = useState(false);
@@ -30,9 +26,14 @@ export default function TopBar({ meetingId, elapsed, view, onSetView, onOriginal
 
   return (
     <div className="relative flex h-11 shrink-0 items-center justify-between bg-stage px-3 text-text-primary md:px-4">
-      {/* Left: encryption shield + Original Sound dropdown */}
-      <div className="flex items-center gap-2">
-        <ShieldCheck className="h-4 w-4 text-active-speaker" />
+      {/* Left: meeting title + shield + sound dropdown */}
+      <div className="flex items-center gap-2 min-w-0">
+        <ShieldCheck className="h-4 w-4 shrink-0 text-active-speaker" />
+        {meetingTitle && (
+          <span className="hidden truncate text-sm font-medium text-text-primary sm:block max-w-[280px]">
+            {meetingTitle}
+          </span>
+        )}
         <div className="relative hidden sm:block">
           <button
             onClick={() => setSoundMenu((v) => !v)}

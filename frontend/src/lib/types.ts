@@ -50,7 +50,7 @@ export interface ScheduleInput {
   title: string;
   description: string | null;
   scheduled_at: string;
-  duration: number;
+  duration?: number | null;
 }
 
 export interface MeetingControls {

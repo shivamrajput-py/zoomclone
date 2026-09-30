@@ -87,10 +87,15 @@ export default function MeetingSession({ join, name, micOn, webcamOn, onLeave }:
   }, [room.status, room.closeReason, isHost, leave]);
 
   if (media) {
+    const hostName = join.meeting.host_name ?? "Host";
+    const meetingTitle = join.meeting.is_instant
+      ? `${hostName}'s Zoom Meeting`
+      : (join.meeting.title ?? `${hostName}'s Zoom Meeting`);
     return (
       <LiveMeeting
         key={meetingId}
         meetingId={meetingId}
+        meetingTitle={meetingTitle}
         media={media}
         participantId={join.participant_id}
         name={name}

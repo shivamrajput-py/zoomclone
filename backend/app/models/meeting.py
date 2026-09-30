@@ -23,7 +23,7 @@ class MeetingStatus(str, enum.Enum):
 class Meeting(Base):
     __tablename__ = "meetings"
 
-    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    id: Mapped[str] = mapped_column(String(11), primary_key=True)  # Zoom-style: ddd-ddd-ddd
     title: Mapped[str] = mapped_column(String(200), index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     host_name: Mapped[str] = mapped_column(String(100))

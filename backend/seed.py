@@ -1,6 +1,8 @@
 import secrets
 from datetime import timedelta
 
+from sqlalchemy import select
+
 from app.core.clock import utcnow
 from app.core.config import settings
 from app.core.database import Base, SessionLocal, engine
@@ -17,13 +19,24 @@ from app.models import (
 
 HOST = settings.default_host_name
 
+# Fixed IDs for sample data — all-numeric Zoom-style (ddd-ddd-ddd).
+SAMPLE_IDS = {
+    "weekly_sync":      "892-573-401",
+    "roadmap":          "134-820-675",
+    "client_demo":      "567-238-910",
+    "sprint_planning":  "301-994-822",
+    "design_review":    "771-002-443",
+    "all_hands":        "654-118-330",
+    "one_on_one":       "489-762-051",
+}
+
 
 def _upcoming(now):
     specs = [
-        ("892-573-401", "Weekly Team Sync", "Our regular Monday stand-up.", timedelta(days=1, hours=2), 60),
-        ("134-820-675", "Product Roadmap Review", "Q4 planning session with all stakeholders.", timedelta(days=2), 90),
-        ("567-238-910", "Client Presentation - Acme Corp", "Demo of the new dashboard features.", timedelta(days=3, hours=5), 45),
-        ("301-994-822", "Engineering Sprint Planning", None, timedelta(days=5), 60),
+        (SAMPLE_IDS["weekly_sync"],     "Weekly Team Sync",                "Our regular Monday stand-up.",                     timedelta(days=1, hours=2), 60),
+        (SAMPLE_IDS["roadmap"],         "Product Roadmap Review",          "Q4 planning session with all stakeholders.",        timedelta(days=2),         90),
+        (SAMPLE_IDS["client_demo"],     "Client Presentation - Acme Corp", "Demo of the new dashboard features.",               timedelta(days=3, hours=5), 45),
+        (SAMPLE_IDS["sprint_planning"], "Engineering Sprint Planning",     None,                                                timedelta(days=5),         60),
     ]
     return [
         Meeting(
@@ -42,9 +55,9 @@ def _upcoming(now):
 
 def _ended(now):
     specs = [
-        ("771-002-443", "Design Review", timedelta(hours=2), 40, ["Priya Sharma", "Sam Lee"]),
-        ("654-118-330", "All-Hands Meeting", timedelta(days=1), 90, ["Priya Sharma", "Sam Lee", "Jordan Kim"]),
-        ("489-762-051", "1:1 with Manager", timedelta(days=2), 30, ["Jordan Kim"]),
+        (SAMPLE_IDS["design_review"], "Design Review",     timedelta(hours=2), 40, ["Priya Sharma", "Sam Lee"]),
+        (SAMPLE_IDS["all_hands"],     "All-Hands Meeting", timedelta(days=1),  90, ["Priya Sharma", "Sam Lee", "Jordan Kim"]),
+        (SAMPLE_IDS["one_on_one"],    "1:1 with Manager",  timedelta(days=2),  30, ["Jordan Kim"]),
     ]
     meetings = []
     for meeting_id, title, ago, duration, guests in specs:
@@ -89,17 +102,34 @@ def _add_chat_and_poll(meeting: Meeting) -> None:
 
 
 def seed_db() -> None:
-    Base.metadata.drop_all(bind=engine)
+    # Create tables if they don't exist yet — never drop existing data.
     Base.metadata.create_all(bind=engine)
 
     now = utcnow()
     ended = _ended(now)
     _add_chat_and_poll(ended[0])
 
+
     with SessionLocal() as db:
-        db.add_all(_upcoming(now) + ended)
-        db.commit()
-    print("Database seeded successfully.")
+        # Only insert sample rows that are not already in the database.
+        sample_id_list = list(SAMPLE_IDS.values())
+        existing_ids = {
+            row for row in db.scalars(
+                select(Meeting.id).where(Meeting.id.in_(sample_id_list))
+            )
+        }
+        new_meetings = [
+            m for m in (_upcoming(now) + ended)
+            if m.id not in existing_ids
+        ]
+        if new_meetings:
+            db.add_all(new_meetings)
+            db.commit()
+            print(f"Seeded {len(new_meetings)} new sample meeting(s).")
+        else:
+            print("Sample data already present — nothing to insert.")
+
+    print("Database ready.")
 
 
 if __name__ == "__main__":

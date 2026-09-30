@@ -2,6 +2,15 @@
 
 A full-stack Zoom clone built as an SDE Fullstack Assignment: it replicates Zoom's look and core meeting workflows — create, join and schedule meetings, then meet with real audio/video, chat, polls and host controls.
 
+## 🚀 Live Demo & Submission Links
+
+| | Link |
+|---|---|
+| **Live App** | _[deploy and add link here]_ |
+| **GitHub Repository** | _[add public repo link here]_ |
+
+> **Evaluator:** The app uses [VideoSDK.live](https://videosdk.live) for real audio/video. To test meetings end-to-end, open the link in two separate browser windows (one incognito) — the first gets host controls, the second joins as a guest.
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -16,7 +25,7 @@ A full-stack Zoom clone built as an SDE Fullstack Assignment: it replicates Zoom
 
 ### Core (from the assignment)
 - **Landing dashboard** — Home / Meetings / History tabs, live clock, New Meeting / Join / Schedule tiles, Upcoming and Recent sections, profile and settings placeholders.
-- **Instant meeting** — one click creates a meeting with a unique Zoom-style ID (e.g. `892-573-401`) and a shareable invite link, then drops you in the room.
+- **Instant meeting** — one click creates a meeting with a unique numeric Zoom-style ID (e.g. `892-573-401`) and a shareable invite link, then drops you in the room.
 - **Join meeting** — by Meeting ID **or a pasted invite link**; you enter a display name first; the meeting is validated before you join.
 - **Schedule meeting** — topic, description, date/time picker, duration; an ID and invite link are generated, stored in the database, and shown under Upcoming.
 
@@ -75,7 +84,7 @@ frontend/src/
 
 ```
 meetings
-  id                TEXT PK          -- Zoom-style ID, e.g. 892-573-401
+  id                TEXT PK          -- Zoom-style numeric ID, e.g. 892-573-401 (ddd-ddd-ddd)
   title             TEXT NOT NULL
   description       TEXT
   host_name         TEXT
@@ -120,7 +129,7 @@ pip install -r requirements.txt
 
 cp .env.example .env        # then fill in VIDEOSDK_API_KEY and VIDEOSDK_SECRET
 
-python seed.py              # sample data (drops and recreates the tables!)
+python seed.py              # sample data (safe to re-run — never drops existing data)
 uvicorn app.main:app --reload --port 8000
 ```
 

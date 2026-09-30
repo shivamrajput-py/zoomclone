@@ -47,6 +47,7 @@ export default function ChatPanel({
   const [attachments, setAttachments] = useState<File[]>([]);
   const [fileError, setFileError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -78,11 +79,15 @@ export default function ChatPanel({
     const text = draft.trim();
     if (!text && attachments.length === 0) return;
     setSending(true);
+    setSendError(null);
     try {
       await onSend(text, attachments);
+      // Only clear on confirmed success — draft is preserved if the send fails.
       setDraft("");
       setAttachments([]);
       setFileError(null);
+    } catch {
+      setSendError("Message failed to send. Please try again.");
     } finally {
       setSending(false);
     }
@@ -131,6 +136,9 @@ export default function ChatPanel({
             )}
             {fileError && (
               <p className="text-xs text-leave-hover">{fileError}</p>
+            )}
+            {sendError && (
+              <p className="text-xs text-leave-hover" role="alert">{sendError}</p>
             )}
 
             <div className="flex items-end gap-2 rounded-lg bg-tile px-3 py-2">
